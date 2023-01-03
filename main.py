@@ -22,7 +22,7 @@ timeout = 10
 
 debug = False
 
-headless = False
+headless = True
 images = False
 maximize = False
 
