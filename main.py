@@ -172,7 +172,7 @@ def sendkeys(driver, xpath, keys, js=False):
 
 
 def getChromeDriver(proxy=None):
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    # return webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     options = webdriver.ChromeOptions()
     options.add_argument('start-maximized')
     options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
