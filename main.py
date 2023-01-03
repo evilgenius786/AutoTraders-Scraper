@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 import traceback
 from datetime import datetime
 
-from random_user_agent.user_agent import UserAgent
+# from random_user_agent.user_agent import UserAgent
 from selenium import webdriver
 
 from selenium.webdriver.common.by import By
@@ -22,7 +22,7 @@ timeout = 10
 
 debug = False
 
-headless = True
+headless = False
 images = False
 maximize = False
 
@@ -174,7 +174,7 @@ def sendkeys(driver, xpath, keys, js=False):
 def getChromeDriver(proxy=None):
     options = webdriver.ChromeOptions()
     options.add_argument('start-maximized')
-    options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
+    # options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
     if debug:
@@ -224,7 +224,13 @@ def getFirefoxDriver():
 if __name__ == '__main__':
     logo()
     driver = getChromeDriver()
-    driver.get('https://www.autotrader.ca')
+    time.sleep(3)
+    driver.get('https://www.google.com/search?q=autotrader.ca')
+    time.sleep(1)
+    click(driver, '//h3')
+    time.sleep(2)
+    # driver.get('https://www.autotrader.ca')
+    print(driver.title)
     time.sleep(1)
     driver.get('https://www.autotrader.ca/cars')
     time.sleep(1)
