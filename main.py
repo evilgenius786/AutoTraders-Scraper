@@ -186,7 +186,7 @@ def getChromeDriver(proxy=None):
         options.add_experimental_option('useAutomationExtension', False)
         options.add_argument("--disable-blink-features")
         options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_argument('--user-data-dir=C:/Selenium1/ChromeProfile1')
+        # options.add_argument('--user-data-dir=C:/Selenium1/ChromeProfile1')
     if not images:
         # print("Turning off images to save bandwidth")
         options.add_argument("--blink-settings=imagesEnabled=false")
