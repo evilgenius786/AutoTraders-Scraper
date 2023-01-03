@@ -21,7 +21,7 @@ timeout = 10
 
 debug = False
 
-headless = False
+headless = True
 images = False
 maximize = False
 
@@ -95,7 +95,6 @@ def getData(url):
 
 
 def main():
-    logo()
     if not os.path.isdir('html'):
         os.mkdir('html')
     if not os.path.isdir('data'):
@@ -218,6 +217,7 @@ def getFirefoxDriver():
 
 
 if __name__ == '__main__':
+    logo()
     driver = getChromeDriver()
     driver.get('https://www.autotrader.ca')
     time.sleep(1)
