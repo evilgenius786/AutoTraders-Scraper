@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import traceback
 from datetime import datetime
 
+from random_user_agent.user_agent import UserAgent
 from selenium import webdriver
 
 from selenium.webdriver.common.by import By
@@ -172,6 +173,10 @@ def sendkeys(driver, xpath, keys, js=False):
 
 def getChromeDriver(proxy=None):
     options = webdriver.ChromeOptions()
+    options.add_argument('start-maximized')
+    options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-sandbox")
     if debug:
         # print("Connecting existing Chrome for debugging...")
         options.debugger_address = "127.0.0.1:9222"
