@@ -1,28 +1,26 @@
 import json
 import os.path
 import time
-from threading import Thread, Semaphore, Lock
-
-# import requests
-from bs4 import BeautifulSoup
 import traceback
 from datetime import datetime
+from random import randint
+from threading import Thread, Semaphore, Lock
 
-from random_user_agent.user_agent import UserAgent
+import requests
+from bs4 import BeautifulSoup
 from selenium import webdriver
-
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
 
 t = 1
 timeout = 10
 
-debug = False
+debug = True
 
-headless = True
+headless = False
 images = False
 maximize = False
 
@@ -34,32 +32,40 @@ headers = {
 
 size = 100
 at = "https://www.autotrader.ca"
-semaphore = Semaphore(1)
+thread_count = 1
+semaphore = Semaphore(thread_count)
 lock = Lock()
 
 
 def get(url):
-    # return requests.get(url, headers=headers)
-    # with lock:
-    driver.get(url)
-    time.sleep(1)
-    return driver.page_source
+    res = requests.get(url, headers=headers).text
+    if "Request unsuccessful. Incapsula incident ID:" not in res:
+        return res
+    with lock:
+        driver.get(url)
+        time.sleep(1)
+        while "Request unsuccessful. Incapsula incident ID:" in driver.page_source:
+            print("[+] Incapsula detected")
+            time.sleep(randint(10, 20))
+            driver.refresh()
+            time.sleep(1)
+        return driver.page_source
 
 
 def getData(url):
     with semaphore:
-        r = get(url)
-        id_ = url.split('/')[-2]
+        id_ = url.split('.ca/')[1].replace('/', '_').split("?")[0]
         html = f'./html/{id_}.html'
         if os.path.isfile(f'./data/{id_}.json'):
-            print(f"[+] {url} already scraped")
+            # print(f"[+] Already scraped {url}")
             return
         print(f"[+] Scraping {url}")
         if os.path.isfile(html):
-            with open(html, 'r') as f:
+            with open(html, 'r', encoding='utf8', errors='ignore') as f:
                 r = f.read()
         else:
-            with open(html, 'w') as f:
+            r = get(url)
+            with open(html, 'w', encoding='utf8', errors='ignore') as f:
                 f.write(r)
         soup = BeautifulSoup(r, 'html.parser')
         data = {'URL': url}
@@ -75,8 +81,8 @@ def getData(url):
             if js:
                 break
         # print(json.dumps(js, indent=4))
-        with open('data.json', 'w') as f:
-            json.dump(js, f, indent=4)
+        # with open('data.json', 'w', encoding='utf8', errors='ignore') as f:
+        #     json.dump(js, f, indent=4)
         data['Title'] = soup.find('title').text
         data['Image'] = soup.find("meta", {"property": "og:image"})['content']
         data['Province'] = js['deepLinkSavedSearch']['savedSearchCriteria']['provinceAbbreviation']
@@ -90,7 +96,7 @@ def getData(url):
         data['Specs'] = js['specifications']['specs']
         data['Hero'] = js['hero']
         # print(json.dumps(data, indent=4))
-        with open(f'./data/{id_}.json', 'w') as f:
+        with open(f'./data/{id_}.json', 'w', encoding='utf8', errors='ignore') as f:
             json.dump(data, f, indent=4)
         return data
 
@@ -100,26 +106,65 @@ def main():
         os.mkdir('html')
     if not os.path.isdir('data'):
         os.mkdir('data')
+    if not os.path.isdir('pages'):
+        os.mkdir('pages')
     # url = 'https://www.autotrader.ca/a/bmw/7%20series/boucherville/quebec/5_54555424_20090324114217770/'
     # getData(url)
     threads = []
-    for i in range(1000):
-        url = f"{at}/cars/?rcp={size}&rcs={i * size}"
-        print(f"[+] Page URL {url}")
-        r = get(url)
-        soup = BeautifulSoup(r, 'html.parser')
-        urls = soup.find_all('a', {"class": "result-title click"})
-        if len(urls) == 0:
-            print("[+] No more pages")
-            with open('error.html', 'w') as efile:
-                efile.write(r)
-            break
-        for a in urls:
-            t = Thread(target=getData, args=(f"{at}{a['href']}",))
-            t.start()
-            threads.append(t)
-        for t in threads:
-            t.join()
+    for year in reversed(range(2010, 2023)):
+        i = 0
+        last_page = 10
+        # url = f"{at}/cars/?rcp={size}&rcs={i * size}"
+        while i < last_page:
+            try:
+                url = f"https://www.autotrader.ca/cars/?rcp={size}&rcs={i * size}&srt=35&yRng={year}%2C{year + 1}&prx=-1&loc=T7X%200A4&hprc=True&wcp=True&sts=New-Used&inMarket=advancedSearch"
+                print(f"[+] Getting page {i} year {year} {url}")
+                if os.path.isfile(f'./pages/{year}-{i}.html'):
+                    i += 1
+                    continue
+                    # with open(f'./pages/{year}-{i}.html', 'r', encoding='utf8', errors='ignore') as f:
+                    #     r = f.read()
+                else:
+                    driver.get(url)
+                    time.sleep(3)
+                    r = driver.page_source
+                    with open(f'./pages/{year}-{i}.html', 'w', encoding='utf8', errors='ignore') as f:
+                        f.write(r)
+                soup = BeautifulSoup(r, 'html.parser')
+                h1 = soup.find('h1')
+                if not h1:
+                    i += 1
+                    print(f"[+] No h1 {url}")
+                    continue
+                print(h1.text.strip())
+                last_page = int(soup.find('li', {"class": "last-page page-item"})['data-page'].strip())
+                # print(f"[+] Last page {last_page}")
+                print(f"[+] Page {i}/{last_page} Year {year} URL {url}")
+                urls = soup.find_all('a', {"class": "result-title click"})
+                while len(urls) == 0:
+                    driver.get(url)
+                    time.sleep(3)
+                    r = driver.page_source
+                with open(f'./pages/{year}-{i}.html', 'w', encoding='utf8', errors='ignore') as f:
+                    f.write(r)
+                soup = BeautifulSoup(r, 'html.parser')
+                urls = soup.find_all('a', {"class": "result-title click", 'href': True})
+                # print("[+] No more pages")
+                # with open('error.html', 'w', encoding='utf8', errors='ignore') as efile:
+                #     efile.write(r)
+                # break
+                for a in urls:
+                    t = Thread(target=getData, args=(f"{at}{a['href']}",))
+                    t.start()
+                    threads.append(t)
+                for t in threads:
+                    t.join()
+            except:
+                traceback.print_exc()
+            i += 1
+    for thread in threads:
+        thread.join()
+    os.rmdir('pages')
 
 
 def logo():
@@ -148,7 +193,6 @@ def pprint(msg):
         traceback.print_exc()
 
 
-
 def click(driver, xpath, js=False):
     if js:
         driver.execute_script("arguments[0].click();", getElement(driver, xpath))
@@ -175,7 +219,7 @@ def getChromeDriver(proxy=None):
     # return webdriver.Chrome(service=Service(ChromeDriverManager().install()))
     options = webdriver.ChromeOptions()
     options.add_argument('start-maximized')
-    options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
+    # options.add_argument(f'user-agent={UserAgent().get_random_user_agent()}')
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
     if debug:
@@ -188,7 +232,7 @@ def getChromeDriver(proxy=None):
         options.add_argument("--disable-blink-features")
         options.add_argument("--disable-blink-features=AutomationControlled")
         if os.name == 'nt':
-            options.add_argument('--user-data-dir=C:/Selenium1/ChromeProfile1')
+            options.add_argument('--user-data-dir=C:/Selenium1/ChromeProfile')
         else:
             options.add_argument('--user-data-dir=/tmp/ChromeProfile1')
     if not images:
@@ -226,16 +270,21 @@ def getFirefoxDriver():
 
 
 if __name__ == '__main__':
-    logo()
-    driver = getChromeDriver()
-    time.sleep(3)
-    driver.get('https://www.google.com/search?q=autotrader.ca')
-    time.sleep(1)
-    # click(driver, '//h3')
-    # time.sleep(2)
-    # driver.get('https://www.autotrader.ca')
-    print(driver.title)
-    time.sleep(1)
-    driver.get('https://www.autotrader.ca/cars')
-    time.sleep(1)
-    main()
+    while True:
+        try:
+            logo()
+            driver = getChromeDriver()
+            time.sleep(3)
+            driver.get('https://www.google.com/search?q=autotrader.ca')
+            time.sleep(1)
+            # click(driver, '//h3')
+            # time.sleep(2)
+            # driver.get('https://www.autotrader.ca')
+            print(driver.title)
+            time.sleep(1)
+            driver.get('https://www.autotrader.ca/cars')
+            time.sleep(1)
+            main()
+            break
+        except:
+            traceback.print_exc()
