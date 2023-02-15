@@ -83,14 +83,14 @@ def getData(url):
         # print(json.dumps(js, indent=4))
         # with open('data.json', 'w', encoding='utf8', errors='ignore') as f:
         #     json.dump(js, f, indent=4)
-        data['Title'] = soup.find('title').text
+        data['Title'] = soup.find('title').text.replace("\\", "").strip()
         data['Image'] = soup.find("meta", {"property": "og:image"})['content']
         data['Province'] = js['deepLinkSavedSearch']['savedSearchCriteria']['provinceAbbreviation']
         for key, val in js['hero'].items():
             if key in ['year', 'price', 'mileage']:
                 data[key.title()] = int(val.replace(',', '').replace('$', '').replace('km', '').strip())
             elif key in ['make', 'model', 'trim', 'vin']:
-                data[key.title()] = val
+                data[key.title()] = val.replace("\\", "").strip()
         if 'featureHighlights' in js and 'options' in js['featureHighlights']:
             data['Features'] = js['featureHighlights']['options']
         data['Specs'] = js['specifications']['specs']
